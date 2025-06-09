@@ -5,9 +5,16 @@
 
 This is a natural extension of the SSE model designed to be used a polymorphic trait in the species/population tree. In this model, the trait must go through a polymorphic state before being fixed as monomorphic (Revell and Harmon 2022; see also Benítez-Álvarez et al. 2020; Zhang et al. 2020; Halali et al. 2021). It can be used for studying sexual dimorphism evolution, or any kind of polymorphic trait. It naturally accounts for possible ancestral polymorphism in phenotype and might be used even if a polymorphic species/population is not observed in the data (although simulation tests should be done indicate the power and identifiability of the model). Nevertheless, it is model of phenotypic evolution which is appropriate when it unlikely that a state is entirely replaced by another in one generation, specially when dealing with recently diverged taxa in the interface between population and species.  
   
-We are interested in testing (1) whether any combination of male and female colors had been disfavored (selected against) or (2) whether any color on any sex had ben disfavored during their evolutionary time in the Brazilian Wandering Spiders (*Phoneutria*) 
+We are interested in testing (1) whether any combination of male and female colors had been disfavored (selected against) or (2) whether any color on any sex had ben disfavored during their evolutionary time.
 
-> Note: we are referring to the the birth rate of the model as a population formation rate, since we are using a population level tree but could be the speciation rate on a species level tree.
+>[!Important]
+> If you use this model, please refer to this GitHub page and cite Azevedo et al. (in prep)  
+>  
+> Azevedo G.H.F., Oliveira U., Santos F.R.,  Vidigal H.D.A., Brescovit A.D, Santos A.J. (in prep). Testing cohesive selective paths and evaluating information loss while delimiting species of Brazilian wandering spiders
+
+  
+> [!Note]
+>> We are referring to the the birth rate of the model as a population formation rate, since we are using a population level tree but could be the speciation rate on a species level tree.
  
 
 ## Setup  
@@ -65,7 +72,7 @@ We are analyzing the main ventral color of the abdomen that is present in three 
  
 This trait can be sexually dimorphic, so we can have a matrix with two traits, one for the male and another for the female:
 
-| Female_Ventral_Color_State | Female_Ventral_Color_State  | 
+| Female_Ventral_Color_State | Male_Ventral_Color_State  | 
 | --------------|--------|  
 | 0 ![brown](https://placehold.co/15x15/862727/862727.png)        | 0 ![brown](https://placehold.co/15x15/862727/862727.png)     |  
 | 1 ![black](https://placehold.co/15x15/000000/000000.png)        | 1 ![black](https://placehold.co/15x15/000000/000000.png)     |  

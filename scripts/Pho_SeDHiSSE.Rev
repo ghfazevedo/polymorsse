@@ -1,0 +1,599 @@
+#####################################################################################
+#
+# Sesxual Dimorphic and Hidden State specific Speciation and Extinction (SeDHiSSE) 
+#  analysis of Azevedo et al. 2026
+#
+# 
+# authors: Guilherme Azevedo
+#
+#####################################################################################
+
+
+######################
+# Inputs and Outputs #
+######################
+
+workDirPath = "../"
+dataDirPath = workDirPath + "data/"
+outDirPath = workDirPath + "outputs/"
+outputPrefix = "Pho_SeDHiSSE"
+dataMatrix = dataDirPath + "Pho_PolyColorMatrix.tsv"
+treeFile = dataDirPath + "Pho_Trees.tre" 
+# set tensorphylo path 
+tensor_path = "/home/ghfa/programs/tensorphylo/build/installer/lib"
+
+
+######################
+#  Model Variables   #
+#    and Options     #
+######################
+
+# Number of combined character states
+n_states_male <- 3 
+n_states_female <- 3
+n_states = n_states_male * n_states_female
+
+# Which tree in the tree file will be used for reconstruction of character state
+tree_to_use <- 2
+
+# define the rate (1/mean) of the exponential distribution of character substitution rates
+zeta_exp_rate <- 10
+
+# define the rate (1/mean) of the exponential distribution transition between rate regimes (hidden states)
+eta_exp_rate <- 1
+
+# define the rate (1/mean) of the exponential distribution of extinction and lineage birth rates
+mu_exp_rate <- 1/10
+lambda_exp_rate  <- 1/10
+
+# define number of hidden state rates
+n_hidden <- 2
+
+# Set the minimum and maximum sampling frequency
+n_min = 0.33
+n_max = 0.66
+
+# Number of cores to use
+n_cores=21
+
+# Number of generations
+n_gen = 1000000
+# Print to screen every x generations
+n_print_screen = 1000
+# Print parameters to file every x generations
+n_print_log = 1000
+# Print tree to file every x generations
+n_print_tree = 1000
+# Number of idependent runs
+n_runs = 1
+# Create checkpoint file every x generations
+n_check_interval = 1000
+# Burn in
+burnin_percentage = 0.10 
+
+# Instead of running for a specific ammount of generations you can check frequently and stop whne ESS reaches a minimum. 
+# Use stopping rules?
+use_stopping_rule = TRUE
+
+# Choose the minimum ESS to stop running.
+minESS = 300
+check_rule_interval = 10000
+
+#######################
+# End of options      #
+#######################
+
+# Create some vector for the moves and monitors of this analysis
+moves    = VectorMoves()
+monitors = VectorMonitors()
+
+# Load Plugins
+loadPlugin("TensorPhylo", tensor_path)
+
+
+##########################
+# The Model and Analyses #
+##########################
+
+data_matrix = readCharacterDataDelimited(dataMatrix, stateLabels=n_states, type="NaturalNumbers", delimiter="\t", header=TRUE)
+
+data_matrix_exp <- data_matrix.expandCharacters( n_hidden )
+
+trees <- readTrees(treeFile)
+phylogeny := trees[tree_to_use]
+
+taxa = trees[tree_to_use].taxa()
+
+# Define the global substitution
+zeta ~ dnExp(zeta_exp_rate)
+moves.append(mvScale(zeta, weight=1))
+
+# Define different transition models for testing hypothesis
+# Transition Model 1: all rates are equal (regardless of state or sex)
+zeta_proportional_m1 <- simplex(rep(1,n_states_male+n_states_female))
+for (i in 1:n_states_male) {
+    zeta_prop_male_m1[i] := zeta_proportional_m1[i]
+}
+for (i in 1:n_states_female) {
+    zeta_prop_female_m1[i] := zeta_proportional_m1[n_states_male+i]
+}
+
+# Transition Model 2: all rates are different
+zeta_proportional_m2 ~ dnDirichlet(rep(1,n_states_male+n_states_female))
+moves.append( mvDirichletSimplex( zeta_proportional_m2, weight=1 ) )
+
+for (i in 1:n_states_male) {
+    zeta_prop_male_m2[i] := zeta_proportional_m2[i]
+}
+for (i in 1:n_states_female) {
+    zeta_prop_female_m2[i] := zeta_proportional_m2[n_states_male+i]
+}
+
+# Transition Model 3: red males have different from the rest thau_m1 == thau_m2 == thau_f1 == thau_f2 == thau_f3 != thau_m3 . Weights (a, a, b, a, a, a)
+zeta_proportional_m3 ~ dnDirichlet(rep(1, 2))
+moves.append( mvDirichletSimplex( zeta_proportional_m3, weight=1 ) )
+
+for (i in 1:n_states_male) {
+    zeta_prop_male_m3[i] := ifelse( i != 3, zeta_proportional_m3[1]/5, zeta_proportional_m3[2])
+}
+for (i in 1:n_states_female) {
+    zeta_prop_female_m3[i] := zeta_proportional_m3[1]/5
+}
+
+
+# Create transition model vector and indicator
+zeta_prop_vector_m := v(zeta_prop_male_m1, zeta_prop_male_m2,
+                           zeta_prop_male_m3)
+						   
+zeta_prop_vector_f := v(zeta_prop_female_m1, zeta_prop_female_m2,
+                           zeta_prop_female_m3)
+
+zeta_model_indicator ~ dnCategorical(simplex(rep(1,zeta_prop_vector_m.size())))
+moves.append( mvRandomGeometricWalk(zeta_model_indicator, weight=10.0, tune=TRUE))
+
+# Create a variable to track the probability of specific transition models in relation to all others
+# Probability of Model 1
+is_transition_equal := ifelse( zeta_model_indicator == 1, 1, 0 )
+# Probability of Model 2
+is_all_transition_different := ifelse( zeta_model_indicator == 2, 1, 0 )
+# Probability of Model 3
+is_red_male_different := ifelse( zeta_model_indicator == 3, 1, 0 )
+
+# Create the transition vectors
+thau_m := zeta_prop_vector_m[zeta_model_indicator]*zeta
+thau_f := zeta_prop_vector_f[zeta_model_indicator]*zeta
+
+# Now we create the Q matrix based on the transition (substitution)
+r[1][1] <- 0
+r[1][2] := thau_m[1]
+r[1][3] := thau_m[1]
+r[1][4] := thau_f[1]
+r[1][5] <- 0
+r[1][6] <- 0
+r[1][7] := thau_f[1]
+r[1][8] <- 0
+r[1][9] <- 0
+
+r[2][1] := thau_m[2]
+r[2][2] <- 0
+r[2][3] := thau_m[2]
+r[2][4] <- 0
+r[2][5] := thau_f[1]
+r[2][6] <- 0
+r[2][7] <- 0
+r[2][8] := thau_f[1]
+r[2][9] <- 0
+
+r[3][1] := thau_m[3]
+r[3][2] := thau_m[3]
+r[3][3] <- 0
+r[3][4] <- 0
+r[3][5] <- 0
+r[3][6] := thau_f[1]
+r[3][7] <- 0
+r[3][8] <- 0
+r[3][9] := thau_f[1]
+
+r[4][1] := thau_f[2]
+r[4][2] <- 0
+r[4][3] <- 0
+r[4][4] <- 0
+r[4][5] := thau_m[1]
+r[4][6] := thau_m[1]
+r[4][7] := thau_f[2]
+r[4][8] <- 0
+r[4][9] <- 0
+
+r[5][1] <- 0
+r[5][2] := thau_f[2]
+r[5][3] <- 0
+r[5][4] := thau_m[2]
+r[5][5] <- 0
+r[5][6] := thau_m[2]
+r[5][7] <- 0
+r[5][8] := thau_f[2]
+r[5][9] <- 0
+
+r[6][1] <- 0
+r[6][2] <- 0
+r[6][3] := thau_f[2]
+r[6][4] := thau_m[3]
+r[6][5] := thau_m[3]
+r[6][6] <- 0
+r[6][7] <- 0
+r[6][8] <- 0
+r[6][9] := thau_f[2]
+
+r[7][1] := thau_f[3]
+r[7][2] <- 0
+r[7][3] <- 0
+r[7][4] := thau_f[3]
+r[7][5] <- 0
+r[7][6] <- 0
+r[7][7] <- 0
+r[7][8] := thau_m[1]
+r[7][9] := thau_m[1]
+
+r[8][1] <- 0
+r[8][2] := thau_f[3]
+r[8][3] <- 0
+r[8][4] <- 0
+r[8][5] := thau_f[3]
+r[8][6] <- 0
+r[8][7] := thau_m[2]
+r[8][8] <- 0
+r[8][9] := thau_m[2]
+
+r[9][1] <- 0
+r[9][2] <- 0
+r[9][3] := thau_f[3]
+r[9][4] <- 0
+r[9][5] <- 0
+r[9][6] := thau_f[3]
+r[9][7] := thau_m[3]
+r[9][8] := thau_m[3]
+r[9][9] <- 0
+
+
+# Create a variable with a more objective names to track the transitions:
+substitution_of_brown_male := thau_m[1]
+substitution_of_black_male := thau_m[2]
+substitution_of_red_male := thau_m[3]
+
+substitution_of_brown_female := thau_f[1]
+substitution_of_black_female := thau_f[2]
+substitution_of_red_female := thau_f[3]
+
+# Transition between hidden states (between diversification regimes)
+eta ~ dnExponential(eta_exp_rate)
+moves.append( mvScale(eta,lambda=0.5,tune=true,weight=5) )
+
+for (i in 1:(n_hidden * (n_hidden - 1))) {
+    HR[i] := eta
+}
+
+# Now you can create the rate matrix combining the observed and hidden states. We do not rescale because we are using absolute rates (not relative rates).
+Q := fnHiddenStateRateMatrix(r, HR, rescaled=false)
+
+# State extinction (death) rates
+
+# We used a global extinction rates, where the state specific is a fraction of that rate. 
+# Note that this is for both rate regimes (Sum of slow and Fast). 
+# The proportional contribution for each regime will be specified further below. 
+mu_global ~ dnExp(mu_exp_rate)
+moves.append(mvScale(mu_global, weight=1))
+
+# We use RJ to test for equal rates between focal states, that is, the states found in our focal putative species: 
+# brown/brown (P. pertyi), black/black (P. eickstedtae), black/red (P. nigriventer), and red/red (P. keyserlingi).
+# We tested two models, one with focal rates equal and other rates fre to vary, and another with all rates varing.
+
+# Detah Model 1: focal rates equal, all the remaining are free to vary
+# Note that in this model we have 6 rates, 1 for the focal and 5 for the remaining states.
+
+total_rates_m01 = 6
+mu_m1_weigths ~ dnDirichlet(rep(1,total_rates_m01))
+moves.append( mvSimplex(mu_m1_weigths, weight=5.0) )
+
+# The last value of the simplex we considered to be the total contribution of focal states
+# (It actualy could be anyone, but this will facilitate coding below).
+# Therefore, we need to divide it by four for each of the focal states.
+# Our focal rates correspond to the states 1, 5, 6 and 9 of our observed amalgamated state matrix.
+
+focal_states <- [1, 5, 6, 9]
+n_focal_states = 4
+n_states = 9
+
+mu_proportional_m1[1] := mu_m1_weigths[total_rates_m01]/n_focal_states
+mu_proportional_m1[2] := mu_m1_weigths[1]
+mu_proportional_m1[3] := mu_m1_weigths[2]
+mu_proportional_m1[4] := mu_m1_weigths[3]
+mu_proportional_m1[5] := mu_m1_weigths[total_rates_m01]/n_focal_states
+mu_proportional_m1[6] := mu_m1_weigths[total_rates_m01]/n_focal_states
+mu_proportional_m1[7] := mu_m1_weigths[4]
+mu_proportional_m1[8] := mu_m1_weigths[5]
+mu_proportional_m1[9] := mu_m1_weigths[total_rates_m01]/n_focal_states
+
+
+# Detah Model 2: all rates are free to vary
+# Our second model have the same number of rates as the total amalgamated states
+# Therefore, it is easier to create.
+
+total_rates_m02 = n_states
+mu_proportional_m2 ~ dnDirichlet(rep(1,total_rates_m02))
+moves.append( mvSimplex(mu_proportional_m2, weight=5.0) )
+
+# Create observed states extinction model vector and indicator
+mu_prop_model_vector := v(mu_proportional_m1,
+                           mu_proportional_m2)
+
+mu_prop_model_indicator ~ dnCategorical(simplex(rep(1,mu_prop_model_vector.size())))
+moves.append( mvRandomGeometricWalk(mu_prop_model_indicator, weight=10.0, tune=TRUE))
+
+mu_obs_prportional := mu_prop_model_vector[mu_prop_model_indicator]
+
+# All observed rates are mutiplied by the global rate to get the global state death (i.e the total contribution of a state in both rate regimes)
+mu_obs := mu_obs_prportional * mu_global
+
+# Track the probability of focal extinction being equal. 1 means yes, 0 means no
+is_focal_death_equal := ifelse(mu_prop_model_indicator == 1, 1, 0 )
+
+# Note that: 
+# mu_obs[1] correspond to brown/brown [P. pertyi] in both diversification regimes
+# mu_obs[5] correspond to black/black [P. eickstedtae] in both diversification regimes
+# mu_obs[6] correspond to black/red [P. nigriventer] in both diversification regimes
+# mu_obs[9] correspond to red/red [P. keyserlingi] in both diversification regimes
+# You can create variable with more interpretable names just to track species specifica total extinction rate, regardless of diversification regime.
+extinction_per := mu_obs[1]
+extinction_eic := mu_obs[5]
+extinction_nig := mu_obs[6]
+extinction_key := mu_obs[9] 
+
+# Global birth rates
+# Since we are using a population tree, these rates represent the probability of population formation (fragmentation of a population in two genetic groups).
+# We assume that all global state specific birth rates are the same (rate independent of state) because we have no hipothesis on how states could contribute to population formation.
+
+lambda_global ~ dnExp(lambda_exp_rate )
+moves.append(mvScale(lambda_global, weight=1))
+
+for (i in 1:n_states){
+    lambda_obs[i] := lambda_global / n_states
+    }
+
+# Different diversification regimes (Hidden state speciation and extinction rates)
+# We assume two different diversification regimes: slow and fast.
+# We used a distribution discretization approach (Höhna et al. 2019) to draw two proprtional birth/deat rates, and then multiply the proprtional rates by the each glomal observed state specific rates (extinction_rates_obs) to create the tw regimes
+# We used RJ to visit a model where therer are two rates regimes (different rates for each hidden state) and  a model with only one regime (rates of both hidden states are equal)
+# A model where the standard deviation of the reate variation distribution is 0, would indicate one single regime
+
+lambda_hidden_lnMean <- ln(1.0)
+lambda_hidden_sd_distr_m0 = 1.0 / 0.587405
+lambda_hidden_sd_distr_m1 = 0.0
+lambda_hidden_upsilon = dnExponential( lambda_hidden_sd_distr_m0)
+lambda_hidden_sigma ~ dnReversibleJumpMixture( lambda_hidden_sd_distr_m1, lambda_hidden_upsilon, p=0.5 )
+#lambda_hidden_sigma ~ dnReversibleJumpMixture( 0.0, dnExponential( 1.0 / 0.587405 ), p=0.5 )
+moves.append( mvScale( lambda_hidden_sigma, weight=1 ) )
+moves.append( mvRJSwitch(lambda_hidden_sigma , weight=1.0) )
+
+# We track the probability of having two different birth rate regimes (0 means no, one means yes) 
+is_there_different_birth_regimes := ifelse(lambda_hidden_sigma == 0, 0, 1)
+
+# Create ech relative rates for both hidden sates and normalized them so it sums to one (proportional rates)
+lambda_hidden_density = dnLognormal(lambda_hidden_lnMean, lambda_hidden_sigma)
+lambda_hidden_unormalized := fnDiscretizeDistribution( lambda_hidden_density, n_hidden )
+#lambda_hidden_unormalized := fnDiscretizeDistribution( dnLognormal(lambda_hidden_lnMean, lambda_hidden_sigma), n_hidden )
+lambda_hidden := lambda_hidden_unormalized / sum(lambda_hidden_unormalized)
+
+# Hidden Extiction rates
+# We do the same for the extinction (death)
+mu_hidden_lnMean <- ln(1.0)
+mu_hidden_sd_distr_m0 = 1.0 / 0.587405
+mu_hidden_sd_distr_m1 = 0.0
+mu_hidden_upsilon = dnExponential( mu_hidden_sd_distr_m0)
+mu_hidden_sigma ~ dnReversibleJumpMixture( mu_hidden_sd_distr_m1, mu_hidden_upsilon, p=0.5 )
+#mu_hidden_sigma ~ dnReversibleJumpMixture( 0.0, dnExponential( 1.0 / 0.587405 ), p=0.5 )
+moves.append( mvScale( mu_hidden_sigma, weight=1 ) )
+moves.append( mvRJSwitch(mu_hidden_sigma , weight=1.0) )
+
+is_there_different_death_regimes := ifelse(mu_hidden_sigma == 0, 0, 1)
+
+mu_hidden_density = dnLognormal(mu_hidden_lnMean, mu_hidden_sigma)
+mu_hidden_unormalized := fnDiscretizeDistribution( mu_hidden_density, n_hidden )
+#mu_hidden_unormalized := fnDiscretizeDistribution( dnLognormal(mu_hidden_lnMean, mu_hidden_sigma), n_hidden )
+mu_hidden := mu_hidden_unormalized / sum(mu_hidden_unormalized)
+
+
+# Combine observed and hidden rates to create the state specific rates for all 18 states (9 for each diversification regime). 
+# We use a loop for that.
+
+for (j in 1:n_hidden) {
+    for (i in 1:n_states) {
+        index = i+(j*n_states)-n_states
+        lambda_state_dependent[index] := lambda_obs[i] * lambda_hidden[j]
+        mu_state_dependent[index] := mu_obs[i] * mu_hidden[j]
+    }
+}
+
+# Root state frequencies
+root_state_freq ~ dnDirichlet(rep(1,data_matrix_exp.maxStates()))
+moves.append(mvSimplex(root_state_freq, weight=1))
+
+# Sampling fraction
+# We account for uncertainty in the sampling rate, since we do not have information on the total number of populations sampled.
+# We assume that we sample between  n_min= 0.33 and n_max = 0.66 of the population, with all values between with equal probabilities.
+sampling_fraction ~ dnUniform(n_min, n_max)
+moves.append( mvScale(sampling_fraction, weight=1) )
+
+# Time tree
+root_age := phylogeny.rootAge()
+
+# Using tensorphylo
+timetree ~ dnGLHBDSP(
+    rootAge     = root_age,
+    lambda      = lambda_state_dependent,
+    mu          = mu_state_dependent,
+    eta         = Q,
+    pi          = root_state_freq,
+    condition   = "time",
+    nStates     = data_matrix_exp.maxStates(),
+    taxa        = taxa,
+    rho         = sampling_fraction,
+    nProc       = n_cores
+)
+
+# Without tensorphylo
+#timetree ~ dnCDBDP( rootAge           = root_age,
+#                    speciationRates   = lambda_state_dependent,
+#                    extinctionRates   = mu_state_dependent,
+#                    Q                 = Q,
+#                    delta             = 1.0,
+#                    pi                = root_state_freq,
+#                    rho               = sampling_fraction,
+#                    condition         = "time" )
+#
+
+
+# Clamp to observed data
+timetree.clamp(phylogeny)
+timetree.clampCharData(data_matrix_exp)
+
+# Monitors
+
+# print to screen
+monitors.append( mnScreen(printgen=n_print_screen) )
+
+# monitor parameters
+monitors.append( mnModel(file=outDirPath+outputPrefix+".model.log", printgen=n_print_log) )
+
+# monitor tree
+monitors.append( mnFile(phylogeny, filename=outDirPath+outputPrefix+".tre", printgen=n_print_tree) )
+
+# monitor ancestral states
+monitors.append( mnJointConditionalAncestralState(tree=phylogeny,
+                                                  glhbdsp=timetree,
+                                                  type="NaturalNumbers",
+                                                  withTips=TRUE,
+                                                  withStartStates=FALSE,
+                                                  filename=outDirPath+outputPrefix+".cond.states.log",
+                                                  printgen=n_print_log) )
+
+# monitor stochastic mappings
+monitors.append( mnStochasticCharacterMap(glhbdsp=timetree,
+                                          filename=outDirPath+outputPrefix+".stoch.log",
+                                          printgen=n_print_log) )
+
+# Monitor branch rates
+monitors.append( mnStochasticBranchRate(glhbdsp=timetree,
+                                        printgen=n_print_tree,
+                                        filename=outDirPath+outputPrefix+".BirthDeathBrRates.log") )
+
+
+# Create the model variable and run
+
+mymodel = model(timetree)
+mymcmc = mcmc(mymodel, monitors, moves, nruns=n_runs, combine="mixed")
+
+if (use_stopping_rule){
+    stopping_rules[1] = srMinESS(minESS, 
+                                 file = outDirPath+outputPrefix+".model.log", 
+                                 freq = check_rule_interval)
+    mymcmc.run(rules = stopping_rules, 
+               checkpointInterval = n_check_interval, 
+               checkpointFile = outDirPath+outputPrefix+".checkpoint") 
+
+} else {
+    mymcmc.run(n_gen, checkpointFile=outDirPath+outputPrefix+".checkpoint", 
+               checkpointInterval= n_check_interval )
+}
+
+
+# Process results
+# get ancestral state trace
+state_trace = readAncestralStateTrace(file=outDirPath+outputPrefix+".cond.states.log")
+# get ancestral state tree trace
+state_tree_trace = readAncestralStateTreeTrace(file=outDirPath+outputPrefix+".tre", treetype="clock")
+# compute burnin
+n_burn = floor(burnin_percentage * state_tree_trace.getNumberSamples())
+
+# Summarize best tree if sampling from a distribution of trees, or co-estimating trees and diversification.
+# We are not doing this, so it is commented.
+# Compute MAP tree for "reference tree"
+#tree_trace = readTreeTrace(file=outDirPath+outputPrefix+".tre", treetype="clock")
+#tree_trace.setBurnin(n_burn)
+#map_tree = mapTree(treeTrace,
+#                   file=outputPrefix + outDirPath+outputPrefix + ".MAP.tre",
+#                   ccAges=TRUE,
+#                   ccp=TRUE,
+#                   conditionalAges=TRUE,
+#                   mean=FALSE,
+#                   sampledAncestors=FALSE,
+#                   positiveBranchLengths=FALSE)
+
+
+# Compute ancestral state tree
+# Conditional reconstruction on target tree
+anc_tree_conditional_target = ancestralStateTree(tree=phylogeny,
+                              ancestral_state_trace_vector=state_trace,
+                              tree_trace=state_tree_trace,
+                              include_start_states=true,
+                              file=outDirPath+outputPrefix+".ase.cond.tre",
+                              burnin=n_burn,
+                              summary_statistic="MAP",
+                              reconstruction="conditional",
+                              site=1)
+
+# Marginal reconstruction on target tree
+anc_tree_marg_target = ancestralStateTree(tree=phylogeny,
+                              ancestral_state_trace_vector=state_trace,
+                              tree_trace=state_tree_trace,
+                              include_start_states=true,
+                              file=outDirPath+outputPrefix+".ase.marg.tre",
+                              burnin=n_burn,
+                              summary_statistic="MAP",
+                              reconstruction="marginal",
+                             site=1)
+
+# Conditional reconstruction on on MAP tree, if it was summarized above.
+# Here we used a fixed tree, so code is commented.
+#anc_tree_conditional_MAP = ancestralStateTree(tree=map_tree,
+#                              ancestral_state_trace_vector=state_trace,
+#                              tree_trace=state_tree_trace,
+#                              include_start_states=true,
+#                              file=outDirPath+outputPrefix+".ase.cond.tre",
+#                              burnin=n_burn,
+#                              summary_statistic="MAP",
+#                              reconstruction="conditional",
+#                              site=1)
+#
+## Marginal reconstruction on MAP tree
+#anc_tree_marg_MAP = ancestralStateTree(tree=map_tree,
+#                              ancestral_state_trace_vector=state_trace,
+#                              tree_trace=state_tree_trace,
+#                              include_start_states=true,
+#                              file=outDirPath+outputPrefix+".ase.marg.tre",
+#                              burnin=n_burn,
+#                              summary_statistic="MAP",
+#                              reconstruction="marginal",
+#                             site=1)
+
+
+# Stochastic map target
+anc_states_stoch_map = readAncestralStateTrace(outDirPath+outputPrefix+".stoch.log")
+summarizeCharacterMaps(anc_states_stoch_map,phylogeny,file=outDirPath+outputPrefix+"charmapTarget.tsv",burnin=n_burn)
+char_map_tree_marginal_targ = characterMapTree(tree=phylogeny,
+                                 ancestral_state_trace_vector=anc_states_stoch_map,
+                                 character_file=outDirPath+outputPrefix+".char.map.marg.target.tre",
+                                 posterior_file=outDirPath+outputPrefix+".pp.map.marg.Target.tre",
+                                 burnin=burnin_percentage,
+                                 reconstruction="marginal",
+                                 num_time_slices=500)
+
+# Stochastic map on MAP tree, if MAP was summarized above.
+# We did not used it here.
+#summarizeCharacterMaps(anc_states_stoch_map,map_tree,file=outDirPath+outputPrefix+"charmapMAP.tsv",burnin=n_burn)
+#char_map_tree_marginal_map = characterMapTree(tree=map_tree,
+#                                 ancestral_state_trace_vector=anc_states_stoch_map,
+#                                 character_file=outDirPath+outputPrefix+".char.map.marg.MAP.tre",
+#                                 posterior_file=outDirPath+outputPrefix+".pp.map.marg.MAP.tre",
+#                                 burnin=burnin_percentage,
+#                                 reconstruction="marginal",
+#                                 num_time_slices=500)

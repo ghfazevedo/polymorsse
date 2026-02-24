@@ -188,25 +188,25 @@ We want a rate matrix that would look like this for the observed states:
 
 |   | 0 ![brown](https://placehold.co/15x15/862727/862727.png) ![brown](https://placehold.co/15x15/862727/862727.png)| 1 ![brown](https://placehold.co/15x15/862727/862727.png) ![black](https://placehold.co/15x15/000000/000000.png) | 2 ![brown](https://placehold.co/15x15/862727/862727.png) ![red](https://placehold.co/15x15/fe1818/fe1818.png)  | 3 ![black](https://placehold.co/15x15/000000/000000.png) ![brown](https://placehold.co/15x15/862727/862727.png) | 4 ![black](https://placehold.co/15x15/000000/000000.png) ![black](https://placehold.co/15x15/000000/000000.png) | 5 ![black](https://placehold.co/15x15/000000/000000.png) ![red](https://placehold.co/15x15/fe1818/fe1818.png) | 6 ![red](https://placehold.co/15x15/fe1818/fe1818.png) ![brown](https://placehold.co/15x15/862727/862727.png) | 7 ![red](https://placehold.co/15x15/fe1818/fe1818.png) ![black](https://placehold.co/15x15/000000/000000.png) | 8 ![red](https://placehold.co/15x15/fe1818/fe1818.png) ![red](https://placehold.co/15x15/fe1818/fe1818.png) |  
 |---|---|---|---|---|---|---|---|---|---| 
-|0 ![brown](https://placehold.co/15x15/862727/862727.png) ![brown](https://placehold.co/15x15/862727/862727.png)  | -     | τ_m<<sub>1</sub> | τ_m<<sub>1</sub> | τ_f<<sub>1</sub> | 0     | 0     | τ_f<<sub>1</sub> | 0     | 0
-|1 ![brown](https://placehold.co/15x15/862727/862727.png) ![black](https://placehold.co/15x15/000000/000000.png)  | τ_m<<sub>2</sub> | -     | τ_m<<sub>2</sub> | 0     | τ_f<<sub>1</sub> | 0     | 0     | τ_f<<sub>1</sub> | 0
-|2 ![brown](https://placehold.co/15x15/862727/862727.png) ![red](https://placehold.co/15x15/fe1818/fe1818.png)    | τ_m<<sub>3</sub> | τ_m<<sub>3</sub> | -     | 0     | 0     | τ_f<<sub>1</sub> | 0     | 0     | τ_f<<sub>1</sub>
-|3 ![black](https://placehold.co/15x15/000000/000000.png) ![brown](https://placehold.co/15x15/862727/862727.png)  | τ_f<<sub>2</sub> | 0     | 0     | -     | τ_m<<sub>1</sub> | τ_m<<sub>1</sub> | τ_f<<sub>2</sub> | 0     | 0
-|4 ![black](https://placehold.co/15x15/000000/000000.png) ![black](https://placehold.co/15x15/000000/000000.png)  | 0     | τ_f<<sub>2</sub> | 0     | τ_m<<sub>2</sub> | -     | τ_m<<sub>2</sub> | 0     | τ_f<<sub>2</sub> | 0
-|5 ![black](https://placehold.co/15x15/000000/000000.png) ![red](https://placehold.co/15x15/fe1818/fe1818.png)    | 0     | 0     | τ_f<<sub>2</sub> | τ_m<<sub>3</sub> | τ_m<<sub>3</sub> | -     | 0     | 0     | τ_f<<sub>2</sub>
-|6 ![red](https://placehold.co/15x15/fe1818/fe1818.png) ![brown](https://placehold.co/15x15/862727/862727.png)    | τ_f<<sub>3</sub> | 0     | 0     | τ_f<<sub>3</sub> | 0     | 0     | -     | τ_m<<sub>1</sub> | τ_m<<sub>1</sub>
-|7 ![red](https://placehold.co/15x15/fe1818/fe1818.png) ![black](https://placehold.co/15x15/000000/000000.png)    | 0     | τ_f<<sub>3</sub> | 0     | 0     | τ_f<<sub>3</sub> | 0     | τ_m<<sub>2</sub> | -     | τ_m<<sub>2</sub>
-|8 ![red](https://placehold.co/15x15/fe1818/fe1818.png) ![red](https://placehold.co/15x15/fe1818/fe1818.png)      | 0     | 0     | τ_f<<sub>3</sub> | 0     | 0     | τ_f<<sub>2</sub> | τ_m<<sub>3</sub> | τ_m<<sub>3</sub> | -
+|0 ![brown](https://placehold.co/15x15/862727/862727.png) ![brown](https://placehold.co/15x15/862727/862727.png)  | -     | τ_m<sub>1</sub> | τ_m<sub>1</sub> | τ_f<sub>1</sub> | 0     | 0     | τ_f<sub>1</sub> | 0     | 0
+|1 ![brown](https://placehold.co/15x15/862727/862727.png) ![black](https://placehold.co/15x15/000000/000000.png)  | τ_m<sub>2</sub> | -     | τ_m<sub>2</sub> | 0     | τ_f<sub>1</sub> | 0     | 0     | τ_f<sub>1</sub> | 0
+|2 ![brown](https://placehold.co/15x15/862727/862727.png) ![red](https://placehold.co/15x15/fe1818/fe1818.png)    | τ_m<sub>3</sub> | τ_m<sub>3</sub> | -     | 0     | 0     | τ_f<sub>1</sub> | 0     | 0     | τ_f<sub>1</sub>
+|3 ![black](https://placehold.co/15x15/000000/000000.png) ![brown](https://placehold.co/15x15/862727/862727.png)  | τ_f<sub>2</sub> | 0     | 0     | -     | τ_m<sub>1</sub> | τ_m<sub>1</sub> | τ_f<sub>2</sub> | 0     | 0
+|4 ![black](https://placehold.co/15x15/000000/000000.png) ![black](https://placehold.co/15x15/000000/000000.png)  | 0     | τ_f<sub>2</sub> | 0     | τ_m<sub>2</sub> | -     | τ_m<sub>2</sub> | 0     | τ_f<sub>2</sub> | 0
+|5 ![black](https://placehold.co/15x15/000000/000000.png) ![red](https://placehold.co/15x15/fe1818/fe1818.png)    | 0     | 0     | τ_f<sub>2</sub> | τ_m<sub>3</sub> | τ_m<sub>3</sub> | -     | 0     | 0     | τ_f<sub>2</sub>
+|6 ![red](https://placehold.co/15x15/fe1818/fe1818.png) ![brown](https://placehold.co/15x15/862727/862727.png)    | τ_f<sub>3</sub> | 0     | 0     | τ_f<sub>3</sub> | 0     | 0     | -     | τ_m<sub>1</sub> | τ_m<sub>1</sub>
+|7 ![red](https://placehold.co/15x15/fe1818/fe1818.png) ![black](https://placehold.co/15x15/000000/000000.png)    | 0     | τ_f<sub>3</sub> | 0     | 0     | τ_f<sub>3</sub> | 0     | τ_m<sub>2</sub> | -     | τ_m<sub>2</sub>
+|8 ![red](https://placehold.co/15x15/fe1818/fe1818.png) ![red](https://placehold.co/15x15/fe1818/fe1818.png)      | 0     | 0     | τ_f<sub>3</sub> | 0     | 0     | τ_f<sub>2</sub> | τ_m<sub>3</sub> | τ_m<sub>3</sub> | -
 
 
 Where: 
-τ_m<<sub>1</sub> is the transition away from brown male (substitution of brown by any other color in males).  
-τ_m<<sub>2</sub> is the transition away from black male (substitution of black by any other color in males).  
-τ_m<<sub>3</sub> is the transition away from the red male (substitution of red by any other color in males).  
+τ_m<sub>1</sub> is the transition away from brown male (substitution of brown by any other color in males).  
+τ_m<sub>2</sub> is the transition away from black male (substitution of black by any other color in males).  
+τ_m<sub>3</sub> is the transition away from the red male (substitution of red by any other color in males).  
 
-τ_f<<sub>1</sub> is the transition away from brown female.  
-τ_f<<sub>2</sub> is the transition away from black female.  
-τ_f<<sub>3</sub> is the transition away from the red female.  
+τ_f<sub>1</sub> is the transition away from brown female.  
+τ_f<sub>2</sub> is the transition away from black female.  
+τ_f<sub>3</sub> is the transition away from the red female.  
 
 We create a global transition rate for each sex, and then we use a Dirichlet distribution to sample proportional rates. The final rate is the product of the proportional rates and the global rate. 
 
